@@ -1,0 +1,12 @@
+{
+  "cnn": {
+    "link": "http://edition.cnn.com/"
+  },
+  "bbc": {
+    "link": "http://www.bbc.com/"
+  },
+  "washingtonpost": {
+    "link": "https://www.washingtonpost.com/"
+  }
+}
+

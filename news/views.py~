@@ -1,0 +1,164 @@
+from django.contrib.auth.models import User, Group
+from rest_framework import viewsets
+from rest_framework import permissions
+from news.serializers import UserSerializer, GroupSerializer,NewsSerializer
+from rest_framework import generics
+from rest_framework import serializers
+from rest_framework import filters
+from rest_framework.permissions import IsAuthenticated
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows users to be viewed or edited.
+    """
+    queryset = User.objects.all().order_by('-date_joined')
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows groups to be viewed or edited.
+    """
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+from django.contrib.auth.models import User
+from django.http import Http404
+from .models import *
+from news.serializers import NewsSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.decorators import api_view,permission_classes
+from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework.permissions import *
+class NewsViewSet(viewsets.ModelViewSet):
+    permission_classes = (IsAuthenticated,)
+    search_fields = ['title','detail','news_from']
+    filter_backends = (filters.SearchFilter,)
+    queryset = News.objects.all()
+    serializer_class = NewsSerializer
+
+class ScrapViewSet(viewsets.ModelViewSet):
+    permission_classes = (IsAuthenticated,)
+    def get(self, request):
+        return Response("YahOOOOOOOOOOOOOOOOOOOOOO")
+
+
+import feedparser as fp
+import json
+import newspaper
+from newspaper import Article
+from time import mktime
+from datetime import datetime
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+def api_index(request):
+    LIMIT = 10
+    data = {}
+    data['newspapers'] = {}
+    with open('NewsPapers.json') as data_file:
+        companies = json.load(data_file)
+        count = 1
+	# Iterate through each news company
+        for company, value in companies.items():
+                print("Building site for ", company)
+                paper = newspaper.build(value['link'], memoize_articles=False)
+                newsPaper = {
+		    "link": value['link'],
+		    "articles": []
+		}
+                noneTypeCount = 0
+                for content in paper.articles:
+                    if count > LIMIT:
+                        break
+                    try:
+                        content.download()
+                        content.parse()
+                    except Exception as e:
+                        print(e)
+                        print("continuing...")
+                        continue
+                    if content.publish_date is None:
+                        print(count, " Article has date of type None...")
+                        noneTypeCount = noneTypeCount + 1
+                        if noneTypeCount > 10:
+                            print("Too many noneType dates, aborting...")
+                            noneTypeCount = 0
+                            break
+                        count = count + 1
+                        continue
+                    article = {}
+                    article['title'] = content.title
+                    article['text'] = content.text
+                    article['link'] = content.url
+                    article['published'] = content.publish_date.isoformat() 
+                    try:
+                        if News.objects.filter(title=content.title).count() > 0:
+                            pass
+                        else:
+                            data=News(title=content.title,detail=content.text,link=content.url,news_from=company,publish_date=content.publish_date)
+                            data.save() 
+                    except Exception as e: 
+                        pass                 
+                    #newsPaper['articles'].append(article)
+                    #print(newsPaper['articles'])
+                    #print(count, "articles downloaded from", company, " using newspaper, url: ", content.url)
+                    count = count + 1
+                    noneTypeCount = 0
+                count = 1
+    return Response("Scraping Done")
+from rest_framework_swagger import renderers
+class SwaggerSchemaView(APIView):
+    permission_classes = [AllowAny]
+    renderer_classes = [
+        renderers.OpenAPIRenderer,
+        renderers.SwaggerUIRenderer
+    ]
+
+    def get(self, request):
+        generator = SchemaGenerator()
+        schema = generator.get_schema(request=request)
+
+        return Response(schema)
+
+
+'''class NewsDetail(generics.RetrieveUpdateDestroyAPIView):
+
+    queryset = News.objects.all()
+    serializer_class = NewsSerializer'''
+'''
+            if 'rss' in value:
+                d = fp.parse(value['rss'])
+                print("Downloading articles from ", company)
+                newsPaper = {
+		    "rss": value['rss'],
+		    "link": value['link'],
+		    "articles": []
+		}
+                for entry in d.entries:
+		    # Check if publish date is provided, if no the article is skipped.
+		    # This is done to keep consistency in the data and to keep the script from crashing.
+                    if hasattr(entry, 'published'):
+                        if count > LIMIT:
+                            break
+                        article = {}
+                        article['link'] = entry.link
+                        date = entry.published_parsed
+                        article['published'] = datetime.fromtimestamp(mktime(date)).isoformat()
+                        try:
+                            content = Article(entry.link)
+                            content.download()
+                            content.parse()
+                        except Exception as e:
+                            print(e)
+                            print("continuing...")
+                            continue
+                        article['title'] = content.title
+                        article['text'] = content.text
+                        newsPaper['articles'].append(article)
+                        print(count, "articles downloaded from", company, ", url: ", entry.link)
+                        count = count + 1
+            else:'''
